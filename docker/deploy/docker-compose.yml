@@ -1,0 +1,24 @@
+version: "3"
+services:
+  server:
+    image: stardustdl/deepcard:server
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - API_SERVER=http://api:80
+    depends_on:
+      - api
+    ports:
+      - "8500:80"
+    entrypoint: ["./wait-for-it.sh", "api:80", "-t", "0", "--", "dotnet", "DeepCard.Server.dll"]
+  client:
+    image: stardustdl/deepcard:client
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - API_SERVER=http://api:80
+    depends_on:
+      - api
+    ports:
+      - "8550:8000"
+    entrypoint: ["./wait-for-it.sh", "api:80", "-t", "0", "--", "dotnet", "run", "-p", "./src/DeepCard.Client.Server"]
+  api:
+    image: stardustdl/deepcard:api

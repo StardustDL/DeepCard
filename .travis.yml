@@ -1,0 +1,33 @@
+jobs:
+  include:
+    - name: docker
+      os: linux
+      dist: xenial
+      language: python
+      services:
+        docker
+      script:
+        - docker-compose build
+        - docker tag deepcard:api $DOCKER_USERNAME/deepcard:api
+        - docker tag deepcard:server $DOCKER_USERNAME/deepcard:server
+        - docker tag deepcard:client $DOCKER_USERNAME/deepcard:client
+        - cd ./docker/deploy
+        - docker-compose up -d && sleep 20
+        - docker stats --no-stream
+        - curl http://localhost:8500 > /dev/null
+        - curl http://localhost:8550 > /dev/null
+        - docker stats --no-stream
+        - docker-compose stop && docker-compose logs -t
+    - stage: deploy
+      if: NOT (type = pull_request)
+      name: image
+      script:
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - docker-compose build
+      - docker images
+      - docker tag deepcard:api $DOCKER_USERNAME/deepcard:api
+      - docker push $DOCKER_USERNAME/deepcard:api
+      - docker tag deepcard:server $DOCKER_USERNAME/deepcard:server
+      - docker push $DOCKER_USERNAME/deepcard:server
+      - docker tag deepcard:client $DOCKER_USERNAME/deepcard:client
+      - docker push $DOCKER_USERNAME/deepcard:client

@@ -1,0 +1,41 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "首页";
+}
+
+<div class="text-center">
+    <h1 class="display-4">欢迎</h1>
+</div>
+
+<h2>@Model.Message</h2>
+
+<form method="post" enctype="multipart/form-data">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="input-group" style="margin-top:10px">
+        <div class="input-group-prepend">
+            <span class="input-group-text">图片</span>
+        </div>
+        <input type="file" class="form-control" asp-for="PostData.ImageFiles" multiple />
+    </div>
+    <button type="submit" class="btn btn-primary btn-block" style="margin-top:10px">
+        提交
+    </button>
+</form>
+
+@if (Model.Results != null)
+{
+    <table align="center">
+        <tr>
+            <th style="text-align:center; font-size:xx-large">照片</th>
+            <th style="text-align:center; font-size:xx-large">识别结果</th>
+        </tr>
+        @foreach (var r in Model.Results)
+        {
+            <tr>
+                <td style="text-align:center"><img src="data:image/jpg;base64,@r.ImageSrc" height="190" width="300" /></td>
+                <td style="text-align:center; font-size:x-large">@r.CardNumber</td>
+            </tr>
+        }
+    </table>
+}

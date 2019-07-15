@@ -1,0 +1,173 @@
+﻿@page "/"
+@inject HttpClient Http
+@inject SDK.RecognitionClient Client
+@inject IJSRuntime JSRuntime
+@using Models
+@using DeepCard.Client.Client.Helpers
+
+<div>
+    <h1 class="display-4">
+        <i class="far fa-credit-card"></i>
+        欢迎
+    </h1>
+    <span>
+        &copy; 2019 - DeepCard - <a href="https://github.com/StardustDL/DeepCard" class="ml-1"><i class="fa fa-code-branch"></i> </a>
+    </span>
+</div>
+
+<button type="submit" class="btn btn-primary btn-block mt-2" @onclick="@OnSubmit">
+    提交
+</button>
+
+<div class="input-group mt-2">
+    <div class="input-group-prepend">
+        <span class="input-group-text">图片</span>
+    </div>
+    <input type="file" class="form-control" @oninput="@OnUploadFile" @ref="FileUpdateInput" multiple />
+</div>
+
+<div class="card-columns mt-4" style="column-count: 4">
+    @foreach (var r in Requests)
+    {
+        <div class="card" width="300">
+            <img class="card-img-top" src="data:image/jpg;base64,@r.EncodedFile" height="210" width="300" />
+            <div class="card-body">
+                <h3 class="card-title" style="font-family: 'Times New Roman';">@r.Result?.KeyView <br /></h3>
+                <h6 class="card-subtitle">@r.View</h6>
+                <p class="card-text mt-2">
+                    @r.Message
+                    @if (r.CostTime.HasValue)
+                    {
+                        <span>（耗时：@(r.CostTime.Value.TotalSeconds.ToString("f2")) 秒）</span>
+                    }
+                    <br />
+                    @if (r.Result?.Bank != null)
+                    {
+                        <span>开户行：@(r.Result.Bank)</span>
+                        <br />
+                        <img src="https://apimg.alipay.com/combo.png?d=cashier&t=@r.Result.BankId" />
+                        <br />
+                    }
+                    @if (r.Result?.CardType != null)
+                    {
+                        <span>类型：@(r.Result.CardType)</span>
+                        <br />
+                    }
+                    @if (r.Result?.Validated != null)
+                    {
+                        <span>验证：@(r.Result.Validated.Value ? "通过" : "不通过")</span>
+                        <br />
+                    }
+                </p>
+
+                <div class="mt-2">
+                    <button class="btn btn-outline-primary" @onclick="@(async e => await OnSubmitFile(r))">
+                        <i class="fa fa-upload"></i>
+                    </button>
+                    <button class="btn btn-outline-info" @onclick="@(async e => await OnQueryFile(r))">
+                        <i class="fa fa-search"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" @onclick="@(async e => await OnDeleteFile(r))">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code{
+    string Message { get; set; }
+
+    ElementRef FileUpdateInput { get; set; }
+
+    List<RequestItem> Requests { get; set; } = new List<RequestItem>();
+
+    private async Task OnUploadFile()
+    {
+        int count = await JSRuntime.InvokeAsync<int>("getFileInputLength", FileUpdateInput);
+        if (count > 0)
+        {
+            List<RequestItem> cur = new List<RequestItem>();
+            foreach (var i in Enumerable.Range(0, count))
+            {
+                var r = new RequestItem { Message = "正在读取图片信息" };
+                cur.Add(r);
+                Requests.Add(r);
+                await Task.Yield();
+                r.Name = await JSRuntime.InvokeAsync<string>("getFileInputItemName", FileUpdateInput, i);
+                r.Size = await JSRuntime.InvokeAsync<int>("getFileInputItemSize", FileUpdateInput, i);
+                await Task.Yield();
+            }
+            foreach (var i in Enumerable.Range(0, count))
+            {
+                var r = cur[i];
+                r.Message = "正在读取图片";
+                r.EncodedFile = await JSRuntime.InvokeAsync<string>("getFileInputDataBase64", FileUpdateInput, i);
+                r.Message = "等待提交";
+                await Task.Yield();
+            }
+            await JSRuntime.InvokeAsync<object>("getFileInputClear", FileUpdateInput);
+        }
+
+        Message = "";
+    }
+
+    private Task OnDeleteFile(RequestItem item)
+    {
+        Requests.Remove(item);
+        return Task.CompletedTask;
+    }
+
+    private async Task OnSubmitFile(RequestItem item)
+    {
+        item.Message = "提交识别中";
+        item.CostTime = null;
+        item.Result = null;
+        await Task.Yield();
+        string c = "";
+        DateTimeOffset before = DateTimeOffset.Now;
+        try
+        {
+            c = await Client.RecognizeAsync(item.EncodedFile);
+            item.Result = new BankCardInfo { Key = c };
+            item.Message = "识别成功";
+        }
+        catch (Exception ex)
+        {
+            item.Message = "识别失败";
+            Console.WriteLine(ex.ToString());
+        }
+        DateTimeOffset after = DateTimeOffset.Now;
+        item.CostTime = after - before;
+    }
+
+    private async Task OnQueryFile(RequestItem item)
+    {
+        item.Message = "查询中";
+        item.CostTime = null;
+        await Task.Yield();
+        DateTimeOffset before = DateTimeOffset.Now;
+        try
+        {
+            var res = await BankCardInfo.Query(Http, item.Result.Key);
+            item.Result = res;
+            item.Message = "查询成功";
+        }
+        catch (Exception ex)
+        {
+            item.Message = "查询失败";
+            Console.WriteLine(ex.ToString());
+        }
+        DateTimeOffset after = DateTimeOffset.Now;
+        item.CostTime = after - before;
+    }
+
+    private async Task OnSubmit()
+    {
+        foreach (var item in Requests)
+        {
+            await OnSubmitFile(item);
+        }
+    }
+}

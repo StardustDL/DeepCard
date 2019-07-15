@@ -1,0 +1,17 @@
+version: "3"
+services:
+  server:
+    build:
+      context: .
+      dockerfile: ./docker/server/Dockerfile
+    image: deepcard:server
+  client:
+    build:
+      context: .
+      dockerfile: ./docker/client/Dockerfile
+    image: deepcard:client
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+    image: deepcard:api
